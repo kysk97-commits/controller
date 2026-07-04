@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>micro:bit Controller</title>
+<style>
+body { font-family: sans-serif; text-align: center; }
+button { width: 120px; height: 50px; margin: 10px; font-size: 18px; }
+#status { margin: 20px; font-size: 20px; }
+</style>
+</head>
+
+<body>
+<h2>micro:bit Controller</h2>
+<div id="status">未接続</div>
+
+<button id="connectBtn">micro:bit 接続</button>
+
+<h3>走行</h3>
+<button onclick="send('F')">前進</button>
+<button onclick="send('B')">後退</button><br>
+<button onclick="send('L')">左回転</button>
+<button onclick="send('R')">右回転</button>
+<button onclick="send('S')">停止</button>
+
+<h3>サーボ</h3>
+<button onclick="send('S1+')">サーボ1 +</button>
+<button onclick="send('S1-')">サーボ1 -</button><br>
+
+<button onclick="send('S2+')">サーボ2 +</button>
+<button onclick="send('S2-')">サーボ2 -</button><br>
+
+<button onclick="send('S3+')">サーボ3 +</button>
+<button onclick="send('S3-')">サーボ3 -</button><br>
+
+<button onclick="send('S4+')">サーボ4 +</button>
+<button onclick="send('S4-')">サーボ4 -</button>
+
+<script>
+let device;
+let characteristic;
+
+document.getElementById("connectBtn").onclick = async () => {
+    try {
+        device = await navigator.bluetooth.requestDevice({
+            filters: [{ namePrefix: "BBC micro:bit" }],
+            optionalServices: ["0000ffe1-0000-1000-8000-00805f9b34fb"]
+        });
+
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService("0000ffe1-0000-1000-8000-00805f9b34fb");
+        characteristic = await service.getCharacteristic("0000ffe1-0000-1000-8000-00805f9b34fb");
+
+        document.getElementById("status").innerText = "接続完了";
+    } catch (e) {
+        document.getElementById("status").innerText = "接続失敗";
+    }
+};
+
+function send(cmd) {
+    if (!characteristic) return;
+    const data = new TextEncoder().encode(cmd);
+    characteristic.writeValue(data);
+}
+</script>
+
+</body>
+</html>
