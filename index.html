@@ -59,7 +59,7 @@ document.getElementById("connectBtn").onclick = async () => {
 
 function send(cmd) {
     if (!characteristic) return;
-    const data = new TextEncoder().encode(cmd);
+    const data = new TextEncoder().encode(cmd + "\n");  // ← ★ここが最重要修正点
     characteristic.writeValue(data);
 }
 </script>
