@@ -40,16 +40,17 @@ button { width: 120px; height: 50px; margin: 10px; font-size: 18px; }
 let device;
 let characteristic;
 
+// ★ micro:bit V2 で安定する UUID → 0xFFE1 を使用
 document.getElementById("connectBtn").onclick = async () => {
     try {
         device = await navigator.bluetooth.requestDevice({
             filters: [{ namePrefix: "BBC micro:bit" }],
-            optionalServices: ["0000ffe1-0000-1000-8000-00805f9b34fb"]
+            optionalServices: [0xFFE1]
         });
 
         const server = await device.gatt.connect();
-        const service = await server.getPrimaryService("0000ffe1-0000-1000-8000-00805f9b34fb");
-        characteristic = await service.getCharacteristic("0000ffe1-0000-1000-8000-00805f9b34fb");
+        const service = await server.getPrimaryService(0xFFE1);
+        characteristic = await service.getCharacteristic(0xFFE1);
 
         document.getElementById("status").innerText = "接続完了";
     } catch (e) {
@@ -57,9 +58,10 @@ document.getElementById("connectBtn").onclick = async () => {
     }
 };
 
+// ★ 改行「\n」を付けることで micro:bit の uartReadUntil が動く
 function send(cmd) {
     if (!characteristic) return;
-    const data = new TextEncoder().encode(cmd + "\n");  // ← ★ここが最重要修正点
+    const data = new TextEncoder().encode(cmd + "\n");
     characteristic.writeValue(data);
 }
 </script>
