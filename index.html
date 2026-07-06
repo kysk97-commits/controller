@@ -73,6 +73,10 @@ document.getElementById("connectBtn").onclick = async () => {
         characteristic = await service.getCharacteristic(0xFFE1);
 
         document.getElementById("status").innerText = "接続完了";
+
+        // ★ 接続成功通知を micro:bit に送る
+        sendJSON({ connected: true });
+
     } catch (e) {
         document.getElementById("status").innerText = "接続失敗";
     }
