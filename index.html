@@ -5,8 +5,17 @@
 <title>micro:bit Controller</title>
 <style>
 body { font-family: sans-serif; text-align: center; }
-button { width: 120px; height: 50px; margin: 10px; font-size: 18px; }
 #status { margin: 20px; font-size: 20px; }
+.stickArea {
+    width: 200px; height: 200px;
+    background: #ddd; border-radius: 100px;
+    margin: 20px auto; position: relative;
+}
+.stick {
+    width: 60px; height: 60px;
+    background: #555; border-radius: 30px;
+    position: absolute; left: 70px; top: 70px;
+}
 </style>
 </head>
 
@@ -16,31 +25,21 @@ button { width: 120px; height: 50px; margin: 10px; font-size: 18px; }
 
 <button id="connectBtn">micro:bit 接続</button>
 
-<h3>走行</h3>
-<button onclick="send('F')">前進</button>
-<button onclick="send('B')">後退</button><br>
-<button onclick="send('L')">左回転</button>
-<button onclick="send('R')">右回転</button>
-<button onclick="send('S')">停止</button>
+<h3>オムニ3輪（移動用）</h3>
+<div id="stickMove" class="stickArea">
+    <div id="stickMoveKnob" class="stick"></div>
+</div>
 
-<h3>サーボ</h3>
-<button onclick="send('S1+')">サーボ1 +</button>
-<button onclick="send('S1-')">サーボ1 -</button><br>
-
-<button onclick="send('S2+')">サーボ2 +</button>
-<button onclick="send('S2-')">サーボ2 -</button><br>
-
-<button onclick="send('S3+')">サーボ3 +</button>
-<button onclick="send('S3-')">サーボ3 -</button><br>
-
-<button onclick="send('S4+')">サーボ4 +</button>
-<button onclick="send('S4-')">サーボ4 -</button>
+<h3>アーム操作（サーボ用）</h3>
+<div id="stickArm" class="stickArea">
+    <div id="stickArmKnob" class="stick"></div>
+</div>
 
 <script>
 let device;
 let characteristic;
 
-// ★ micro:bit V2 で安定する UUID → 0xFFE1 を使用
+// micro:bit V2 の UART UUID
 document.getElementById("connectBtn").onclick = async () => {
     try {
         device = await navigator.bluetooth.requestDevice({
@@ -58,10 +57,65 @@ document.getElementById("connectBtn").onclick = async () => {
     }
 };
 
-// ★ 改行「\n」を付けることで micro:bit の uartReadUntil が動く
-function send(cmd) {
+// スティックの値
+let moveX = 0, moveY = 0;
+let armX = 0, armY = 0;
+
+// スティック処理
+function setupStick(areaId, knobId, callback) {
+    const area = document.getElementById(areaId);
+    const knob = document.getElementById(knobId);
+
+    area.addEventListener("touchmove", (e) => {
+        const rect = area.getBoundingClientRect();
+        const x = e.touches[0].clientX - rect.left - 100;
+        const y = e.touches[0].clientY - rect.top - 100;
+
+        const r = Math.min(80, Math.sqrt(x*x + y*y));
+        const angle = Math.atan2(y, x);
+
+        const nx = r * Math.cos(angle);
+        const ny = r * Math.sin(angle);
+
+        knob.style.left = (nx + 100 - 30) + "px";
+        knob.style.top = (ny + 100 - 30) + "px";
+
+        callback(nx, ny);
+    });
+
+    area.addEventListener("touchend", () => {
+        knob.style.left = "70px";
+        knob.style.top = "70px";
+        callback(0, 0);
+    });
+}
+
+// 移動スティック
+setupStick("stickMove", "stickMoveKnob", (x, y) => {
+    moveX = Math.round(x);
+    moveY = Math.round(y);
+    sendData();
+});
+
+// アームスティック
+setupStick("stickArm", "stickArmKnob", (x, y) => {
+    armX = Math.round(x);
+    armY = Math.round(y);
+    sendData();
+});
+
+// UART送信（JSON形式）
+function sendData() {
     if (!characteristic) return;
-    const data = new TextEncoder().encode(cmd + "\n");
+
+    const obj = {
+        x: moveX,
+        y: moveY,
+        ax: armX,
+        ay: armY
+    };
+
+    const data = new TextEncoder().encode(JSON.stringify(obj) + "\n");
     characteristic.writeValue(data);
 }
 </script>
