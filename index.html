@@ -2,44 +2,65 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>micro:bit Controller</title>
+<title>micro:bit Gamepad Controller</title>
 <style>
-body { font-family: sans-serif; text-align: center; }
+body { font-family: sans-serif; text-align: center; background: #222; color: white; }
 #status { margin: 20px; font-size: 20px; }
+
 .stickArea {
     width: 200px; height: 200px;
-    background: #ddd; border-radius: 100px;
-    margin: 20px auto; position: relative;
+    background: #444; border-radius: 100px;
+    margin: 20px; position: relative; display: inline-block;
 }
 .stick {
-    width: 60px; height: 60px;
-    background: #555; border-radius: 30px;
-    position: absolute; left: 70px; top: 70px;
+    width: 70px; height: 70px;
+    background: #00aaff; border-radius: 35px;
+    position: absolute; left: 65px; top: 65px;
+    box-shadow: 0 0 10px #00aaff;
+}
+
+.button {
+    width: 70px; height: 70px;
+    background: #555; border-radius: 35px;
+    display: inline-flex; justify-content: center; align-items: center;
+    margin: 10px; font-size: 24px; color: white;
+    box-shadow: 0 0 10px #999;
+}
+.button:active {
+    background: #00ff99;
 }
 </style>
 </head>
 
 <body>
-<h2>micro:bit Controller</h2>
+<h2>micro:bit Gamepad Controller</h2>
 <div id="status">未接続</div>
 
 <button id="connectBtn">micro:bit 接続</button>
 
-<h3>オムニ3輪（移動用）</h3>
+<h3>オムニ3輪（左スティック）</h3>
 <div id="stickMove" class="stickArea">
     <div id="stickMoveKnob" class="stick"></div>
 </div>
 
-<h3>アーム操作（サーボ用）</h3>
+<h3>アーム操作（右スティック）</h3>
 <div id="stickArm" class="stickArea">
     <div id="stickArmKnob" class="stick"></div>
+</div>
+
+<h3>ボタン</h3>
+<div>
+    <div class="button" onclick="pressButton('A')">A</div>
+    <div class="button" onclick="pressButton('B')">B</div>
+    <div class="button" onclick="pressButton('X')">X</div>
+    <div class="button" onclick="pressButton('Y')">Y</div>
 </div>
 
 <script>
 let device;
 let characteristic;
 
-// micro:bit V2 の UART UUID
+// micro:bit V2 UART UUID
 document.getElementById("connectBtn").onclick = async () => {
     try {
         device = await navigator.bluetooth.requestDevice({
@@ -57,7 +78,7 @@ document.getElementById("connectBtn").onclick = async () => {
     }
 };
 
-// スティックの値
+// スティック値
 let moveX = 0, moveY = 0;
 let armX = 0, armY = 0;
 
@@ -77,44 +98,50 @@ function setupStick(areaId, knobId, callback) {
         const nx = r * Math.cos(angle);
         const ny = r * Math.sin(angle);
 
-        knob.style.left = (nx + 100 - 30) + "px";
-        knob.style.top = (ny + 100 - 30) + "px";
+        knob.style.left = (nx + 100 - 35) + "px";
+        knob.style.top = (ny + 100 - 35) + "px";
 
         callback(nx, ny);
     });
 
     area.addEventListener("touchend", () => {
-        knob.style.left = "70px";
-        knob.style.top = "70px";
+        knob.style.left = "65px";
+        knob.style.top = "65px";
         callback(0, 0);
     });
 }
 
-// 移動スティック
+// 左スティック（オムニ）
 setupStick("stickMove", "stickMoveKnob", (x, y) => {
     moveX = Math.round(x);
     moveY = Math.round(y);
     sendData();
 });
 
-// アームスティック
+// 右スティック（サーボ）
 setupStick("stickArm", "stickArmKnob", (x, y) => {
     armX = Math.round(x);
     armY = Math.round(y);
     sendData();
 });
 
-// UART送信（JSON形式）
-function sendData() {
-    if (!characteristic) return;
+// ボタン送信
+function pressButton(btn) {
+    sendJSON({ btn: btn });
+}
 
-    const obj = {
+// UART送信（JSON）
+function sendData() {
+    sendJSON({
         x: moveX,
         y: moveY,
         ax: armX,
         ay: armY
-    };
+    });
+}
 
+function sendJSON(obj) {
+    if (!characteristic) return;
     const data = new TextEncoder().encode(JSON.stringify(obj) + "\n");
     characteristic.writeValue(data);
 }
