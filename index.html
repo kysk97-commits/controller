@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>micro:bit Gamepad Controller</title>
+<title>micro:bit Controller</title>
 <style>
 body { font-family: sans-serif; text-align: center; background: #222; color: white; }
 #status { margin: 20px; font-size: 20px; }
@@ -33,7 +33,7 @@ body { font-family: sans-serif; text-align: center; background: #222; color: whi
 </head>
 
 <body>
-<h2>micro:bit Gamepad Controller</h2>
+<h2>micro:bit Controller</h2>
 <div id="status">未接続</div>
 
 <button id="connectBtn">micro:bit 接続</button>
@@ -60,24 +60,30 @@ body { font-family: sans-serif; text-align: center; background: #222; color: whi
 let device;
 let characteristic;
 
-// micro:bit V2 UART UUID
+// micro:bit UART UUID（完全形式）
+const UART_UUID = '0000ffe1-0000-1000-8000-00805f9b34fb';
+
 document.getElementById("connectBtn").onclick = async () => {
     try {
+        console.log("Bluetooth request started");
+
+        // ★ フィルタを外して必ず選択画面を出す
         device = await navigator.bluetooth.requestDevice({
-            filters: [{ namePrefix: "BBC micro:bit" }],
-            optionalServices: [0xFFE1]
+            acceptAllDevices: true,
+            optionalServices: [UART_UUID]
         });
 
         const server = await device.gatt.connect();
-        const service = await server.getPrimaryService(0xFFE1);
-        characteristic = await service.getCharacteristic(0xFFE1);
+        const service = await server.getPrimaryService(UART_UUID);
+        characteristic = await service.getCharacteristic(UART_UUID);
 
         document.getElementById("status").innerText = "接続完了";
 
-        // ★ 接続成功通知を micro:bit に送る
+        // ★ 接続成功通知
         sendJSON({ connected: true });
 
     } catch (e) {
+        console.log(e);
         document.getElementById("status").innerText = "接続失敗";
     }
 };
