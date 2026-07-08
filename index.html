@@ -2,54 +2,81 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>micro:bit PC Controller</title>
+<title>micro:bit Controller</title>
 <style>
+body {
+    font-family: sans-serif;
+    text-align: center;
+    margin-top: 40px;
+}
 button {
-  font-size: 20px;
-  padding: 10px 20px;
-  margin: 10px;
+    font-size: 22px;
+    padding: 15px 25px;
+    margin: 10px;
 }
 </style>
 </head>
+
 <body>
+<h1>micro:bit Controller</h1>
 
-<h2>micro:bit PC Controller</h2>
-
-<button onclick="connect()">micro:bit 接続</button>
-<button onclick="send('A')">A</button>
-<button onclick="send('B')">B</button>
-<button onclick="send('STOP')">STOP</button>
+<button id="connectBtn">🔵 Connect micro:bit</button>
+<button id="sendBtn">📤 Send Test JSON</button>
 
 <script>
-let device = null;
-let uartService = null;
+let uartServer;
+let uartTx;
 
-async function connect() {
-  try {
-    device = await navigator.bluetooth.requestDevice({
-      filters: [{ namePrefix: "BBC micro:bit" }],
-      optionalServices: ["6e400001-b5a3-f393-e0a9-e50e24dcca9e"]
-    });
+// UART UUID（micro:bit 固定）
+const UART_SERVICE = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+const UART_TX = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";   // write
+const UART_RX = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";   // notify
 
-    const server = await device.gatt.connect();
-    uartService = await server.getPrimaryService("6e400001-b5a3-f393-e0a9-e50e24dcca9e");
+// ① 接続処理
+document.getElementById("connectBtn").onclick = async () => {
+    try {
+        console.log("Requesting device...");
 
-    alert("micro:bit 接続完了");
-  } catch (error) {
-    alert("接続エラー: " + error);
-  }
-}
+        // ★ スマホで確実に選択画面が出る設定
+        const device = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: [UART_SERVICE]
+        });
 
-async function send(text) {
-  if (!uartService) {
-    alert("まだ接続されていません");
-    return;
-  }
+        console.log("Connecting...");
+        const server = await device.gatt.connect();
 
-  const tx = await uartService.getCharacteristic("6e400002-b5a3-f393-e0a9-e50e24dcca9e");
-  await tx.writeValue(new TextEncoder().encode(text));
-}
+        uartServer = await server.getPrimaryService(UART_SERVICE);
+        uartTx = await uartServer.getCharacteristic(UART_TX);
+
+        alert("micro:bit と接続成功！");
+
+    } catch (error) {
+        alert("接続エラー: " + error);
+        console.error(error);
+    }
+};
+
+// ② JSON送信テスト
+document.getElementById("sendBtn").onclick = async () => {
+    if (!uartTx) {
+        alert("まだ接続されていません");
+        return;
+    }
+
+    const data = {
+        x: 512,
+        y: 300,
+        btnA: 1,
+        btnB: 0
+    };
+
+    const text = JSON.stringify(data) + "\n";
+    const encoder = new TextEncoder();
+    await uartTx.writeValue(encoder.encode(text));
+
+    alert("JSON を送信しました！");
+};
 </script>
-
 </body>
 </html>
