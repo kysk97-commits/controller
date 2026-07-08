@@ -14,10 +14,6 @@ button {
     padding: 15px 25px;
     margin: 10px;
 }
-input {
-    width: 80px;
-    font-size: 20px;
-}
 </style>
 </head>
 
@@ -25,21 +21,7 @@ input {
 <h1>micro:bit Controller</h1>
 
 <button id="connectBtn">🔵 Connect micro:bit</button>
-<button id="sendBtn">📤 Send JSON</button>
-
-<h2>Joystick 1</h2>
-X1: <input id="x1" type="number" value="512"><br>
-Y1: <input id="y1" type="number" value="512"><br>
-
-<h2>Joystick 2</h2>
-X2: <input id="x2" type="number" value="512"><br>
-Y2: <input id="y2" type="number" value="512"><br>
-
-<h2>Buttons</h2>
-A: <input id="btnA" type="number" value="0"><br>
-B: <input id="btnB" type="number" value="0"><br>
-X: <input id="btnX" type="number" value="0"><br>
-Y: <input id="btnY" type="number" value="0"><br>
+<button id="sendBtn">📤 Send Test JSON</button>
 
 <script>
 let uartServer;
@@ -48,27 +30,34 @@ let uartTx;
 // UART UUID（micro:bit 固定）
 const UART_SERVICE = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
 const UART_TX = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";   // write
+const UART_RX = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";   // notify
 
 // ① 接続処理
 document.getElementById("connectBtn").onclick = async () => {
     try {
+        console.log("Requesting device...");
+
+        // ★ スマホで確実に選択画面が出る設定
         const device = await navigator.bluetooth.requestDevice({
             acceptAllDevices: true,
             optionalServices: [UART_SERVICE]
         });
 
+        console.log("Connecting...");
         const server = await device.gatt.connect();
+
         uartServer = await server.getPrimaryService(UART_SERVICE);
         uartTx = await uartServer.getCharacteristic(UART_TX);
 
         alert("micro:bit と接続成功！");
+
     } catch (error) {
         alert("接続エラー: " + error);
         console.error(error);
     }
 };
 
-// ② JSON送信
+// ② JSON送信テスト
 document.getElementById("sendBtn").onclick = async () => {
     if (!uartTx) {
         alert("まだ接続されていません");
@@ -76,21 +65,17 @@ document.getElementById("sendBtn").onclick = async () => {
     }
 
     const data = {
-        x1: Number(document.getElementById("x1").value),
-        y1: Number(document.getElementById("y1").value),
-        x2: Number(document.getElementById("x2").value),
-        y2: Number(document.getElementById("y2").value),
-        A: Number(document.getElementById("btnA").value),
-        B: Number(document.getElementById("btnB").value),
-        X: Number(document.getElementById("btnX").value),
-        Y: Number(document.getElementById("btnY").value)
+        x: 512,
+        y: 300,
+        btnA: 1,
+        btnB: 0
     };
 
     const text = JSON.stringify(data) + "\n";
     const encoder = new TextEncoder();
     await uartTx.writeValue(encoder.encode(text));
 
-    console.log("Sent:", text);
+    alert("JSON を送信しました！");
 };
 </script>
 </body>
