@@ -1,123 +1,209 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
-<meta charset="UTF-8">
+<meta charset="utf-8">
 <title>micro:bit Controller</title>
-
 <style>
-body{
-    background:#222;
-    color:white;
-    text-align:center;
-    font-family:sans-serif;
+body {
+    font-family: sans-serif;
+    text-align: center;
+    background: #222;
+    color: white;
 }
 
-button{
-    width:120px;
-    height:60px;
-    margin:10px;
-    font-size:20px;
+button {
+    font-size: 22px;
+    padding: 15px 25px;
+    margin: 10px;
 }
 
-#status{
-    margin:20px;
-    font-size:22px;
+#pad {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 30px;
+}
+
+.joystickArea {
+    width: 180px;
+    height: 180px;
+    background: #444;
+    border-radius: 50%;
+    position: relative;
+    touch-action: none;
+}
+
+.stick {
+    width: 70px;
+    height: 70px;
+    background: #00aaff;
+    border-radius: 50%;
+    position: absolute;
+    left: 55px;
+    top: 55px;
+}
+
+#buttons {
+    margin-top: 40px;
+}
+
+.btn {
+    width: 80px;
+    height: 80px;
+    background: #ff4444;
+    border-radius: 50%;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 30px;
+    margin: 10px;
+    touch-action: none;
 }
 </style>
-
 </head>
 
 <body>
+<h1>micro:bit Controller</h1>
 
-<h2>micro:bit Controller</h2>
+<button id="connectBtn">🔵 Connect micro:bit</button>
 
-<div id="status">未接続</div>
+<div id="pad">
+    <div id="joy1" class="joystickArea">
+        <div id="stick1" class="stick"></div>
+    </div>
 
-<button onclick="connect()">micro:bit接続</button>
+    <div id="joy2" class="joystickArea">
+        <div id="stick2" class="stick"></div>
+    </div>
+</div>
+
+<div id="buttons">
+    <div id="btnA" class="btn">A</div>
+    <div id="btnB" class="btn">B</div>
+    <div id="btnX" class="btn">X</div>
+    <div id="btnY" class="btn">Y</div>
+</div>
 
 <script>
+let uartTx;
 
-let rxCharacteristic = null;
+// UART UUID
+const UART_SERVICE = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+const UART_TX = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 
-// Nordic UART Service
-const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-const RX_UUID      = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
-const TX_UUID      = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
+// joystick values
+let x1 = 512, y1 = 512;
+let x2 = 512, y2 = 512;
 
-async function connect(){
+// button values
+let A = 0, B = 0, X = 0, Y = 0;
 
-    try{
-
-        document.getElementById("status").innerHTML="検索中...";
-
-        const device =
-        await navigator.bluetooth.requestDevice({
-
-            acceptAllDevices:true,
-
-            optionalServices:[
-                SERVICE_UUID
-            ]
-
+// --------------------
+// micro:bit 接続
+// --------------------
+document.getElementById("connectBtn").onclick = async () => {
+    try {
+        const device = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: [UART_SERVICE]
         });
 
-        const server =
-        await device.gatt.connect();
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService(UART_SERVICE);
+        uartTx = await service.getCharacteristic(UART_TX);
 
-        const service =
-        await server.getPrimaryService(
-            SERVICE_UUID
-        );
-
-        rxCharacteristic =
-        await service.getCharacteristic(
-            RX_UUID
-        );
-
-        document.getElementById("status").innerHTML="接続成功";
-
+        alert("micro:bit と接続成功！");
+    } catch (e) {
+        alert("接続エラー: " + e);
     }
+};
 
-    catch(e){
+// --------------------
+// JSON送信
+// --------------------
+function sendJSON() {
+    if (!uartTx) return;
 
-        console.log(e);
+    const data = {
+        x1, y1,
+        x2, y2,
+        A, B, X, Y
+    };
 
-        document.getElementById("status").innerHTML="接続失敗";
-
-    }
-
+    const text = JSON.stringify(data) + "\n";
+    const encoder = new TextEncoder();
+    uartTx.writeValue(encoder.encode(text));
 }
 
-async function send(cmd){
+// --------------------
+// ジョイスティック処理
+// --------------------
+function setupJoystick(areaId, stickId, callback) {
+    const area = document.getElementById(areaId);
+    const stick = document.getElementById(stickId);
 
-    if(rxCharacteristic==null){
+    const rect = area.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
 
-        alert("先に接続してください");
+    area.addEventListener("pointerdown", start);
+    area.addEventListener("pointermove", move);
+    area.addEventListener("pointerup", end);
+    area.addEventListener("pointerleave", end);
 
-        return;
+    function start(e) { move(e); }
+    function move(e) {
+        const x = e.offsetX - centerX;
+        const y = e.offsetY - centerY;
 
+        const limit = 60;
+        const dx = Math.max(-limit, Math.min(limit, x));
+        const dy = Math.max(-limit, Math.min(limit, y));
+
+        stick.style.left = (centerX + dx - 35) + "px";
+        stick.style.top = (centerY + dy - 35) + "px";
+
+        const valX = Math.floor((dx + limit) * (1023 / (limit * 2)));
+        const valY = Math.floor((dy + limit) * (1023 / (limit * 2)));
+
+        callback(valX, valY);
+        sendJSON();
     }
 
-    const data =
-    new TextEncoder().encode(cmd+"\n");
-
-    await rxCharacteristic.writeValue(data);
-
+    function end() {
+        stick.style.left = (centerX - 35) + "px";
+        stick.style.top = (centerY - 35) + "px";
+        callback(512, 512);
+        sendJSON();
+    }
 }
+
+setupJoystick("joy1", "stick1", (vx, vy) => { x1 = vx; y1 = vy; });
+setupJoystick("joy2", "stick2", (vx, vy) => { x2 = vx; y2 = vy; });
+
+// --------------------
+// ボタン処理
+// --------------------
+function setupButton(id, setter) {
+    const btn = document.getElementById(id);
+
+    btn.addEventListener("pointerdown", () => {
+        setter(1);
+        btn.style.background = "#ffaa00";
+        sendJSON();
+    });
+
+    btn.addEventListener("pointerup", () => {
+        setter(0);
+        btn.style.background = "#ff4444";
+        sendJSON();
+    });
+}
+
+setupButton("btnA", v => A = v);
+setupButton("btnB", v => B = v);
+setupButton("btnX", v => X = v);
+setupButton("btnY", v => Y = v);
 
 </script>
-
-<br>
-
-<button onclick="send('F')">前進</button><br>
-
-<button onclick="send('L')">左</button>
-
-<button onclick="send('S')">停止</button>
-
-<button onclick="send('R')">右</button><br>
-
-<button onclick="send('B')">後退</button>
-
 </body>
 </html>
