@@ -91,11 +91,14 @@ const UART_SERVICE = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
 const UART_TX = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 
 // joystick values
-let x1 = 512, y1 = 512;
-let x2 = 512, y2 = 512;
+let x1 = 512, y1 = 512;  // オムニ用
+let x2 = 512, y2 = 512;  // アーム用
 
 // button values
 let A = 0, B = 0, X = 0, Y = 0;
+
+// command（アームの追加動作）
+let cmd = "";
 
 // --------------------
 // micro:bit 接続
@@ -124,9 +127,12 @@ function sendJSON() {
     if (!uartTx) return;
 
     const data = {
-        x1, y1,
-        x2, y2,
-        A, B, X, Y
+        omniX: x1,
+        omniY: y1,
+        armX: x2,
+        armY: y2,
+        A, B, X, Y,
+        cmd
     };
 
     const text = JSON.stringify(data) + "\n";
@@ -183,26 +189,28 @@ setupJoystick("joy2", "stick2", (vx, vy) => { x2 = vx; y2 = vy; });
 // --------------------
 // ボタン処理
 // --------------------
-function setupButton(id, setter) {
+function setupButton(id, setter, command) {
     const btn = document.getElementById(id);
 
     btn.addEventListener("pointerdown", () => {
         setter(1);
+        cmd = command;
         btn.style.background = "#ffaa00";
         sendJSON();
     });
 
     btn.addEventListener("pointerup", () => {
         setter(0);
+        cmd = "";
         btn.style.background = "#ff4444";
         sendJSON();
     });
 }
 
-setupButton("btnA", v => A = v);
-setupButton("btnB", v => B = v);
-setupButton("btnX", v => X = v);
-setupButton("btnY", v => Y = v);
+setupButton("btnA", v => A = v, "arm_up");
+setupButton("btnB", v => B = v, "arm_down");
+setupButton("btnX", v => X = v, "arm_open");
+setupButton("btnY", v => Y = v, "arm_close");
 
 </script>
 </body>
