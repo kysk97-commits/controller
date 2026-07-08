@@ -46,37 +46,4 @@ document.getElementById("connectBtn").onclick = async () => {
         console.log("Connecting...");
         const server = await device.gatt.connect();
 
-        uartServer = await server.getPrimaryService(UART_SERVICE);
-        uartTx = await uartServer.getCharacteristic(UART_TX);
-
-        alert("micro:bit と接続成功！");
-
-    } catch (error) {
-        alert("接続エラー: " + error);
-        console.error(error);
-    }
-};
-
-// ② JSON送信テスト
-document.getElementById("sendBtn").onclick = async () => {
-    if (!uartTx) {
-        alert("まだ接続されていません");
-        return;
-    }
-
-    const data = {
-        x: 512,
-        y: 300,
-        btnA: 1,
-        btnB: 0
-    };
-
-    const text = JSON.stringify(data) + "\n";
-    const encoder = new TextEncoder();
-    await uartTx.writeValue(encoder.encode(text));
-
-    alert("JSON を送信しました！");
-};
-</script>
-</body>
-</html>
+        uartServer
