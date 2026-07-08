@@ -1,49 +1,123 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
 <title>micro:bit Controller</title>
+
 <style>
-body {
-    font-family: sans-serif;
-    text-align: center;
-    margin-top: 40px;
+body{
+    background:#222;
+    color:white;
+    text-align:center;
+    font-family:sans-serif;
 }
-button {
-    font-size: 22px;
-    padding: 15px 25px;
-    margin: 10px;
+
+button{
+    width:120px;
+    height:60px;
+    margin:10px;
+    font-size:20px;
+}
+
+#status{
+    margin:20px;
+    font-size:22px;
 }
 </style>
+
 </head>
 
 <body>
-<h1>micro:bit Controller</h1>
 
-<button id="connectBtn">🔵 Connect micro:bit</button>
-<button id="sendBtn">📤 Send Test JSON</button>
+<h2>micro:bit Controller</h2>
+
+<div id="status">未接続</div>
+
+<button onclick="connect()">micro:bit接続</button>
 
 <script>
-let uartServer;
-let uartTx;
 
-// UART UUID（micro:bit 固定）
-const UART_SERVICE = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-const UART_TX = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";   // write
-const UART_RX = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";   // notify
+let rxCharacteristic = null;
 
-// ① 接続処理
-document.getElementById("connectBtn").onclick = async () => {
-    try {
-        console.log("Requesting device...");
+// Nordic UART Service
+const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+const RX_UUID      = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+const TX_UUID      = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
 
-        // ★ スマホで確実に選択画面が出る設定
-        const device = await navigator.bluetooth.requestDevice({
-            acceptAllDevices: true,
-            optionalServices: [UART_SERVICE]
+async function connect(){
+
+    try{
+
+        document.getElementById("status").innerHTML="検索中...";
+
+        const device =
+        await navigator.bluetooth.requestDevice({
+
+            acceptAllDevices:true,
+
+            optionalServices:[
+                SERVICE_UUID
+            ]
+
         });
 
-        console.log("Connecting...");
-        const server = await device.gatt.connect();
+        const server =
+        await device.gatt.connect();
 
-        uartServer
+        const service =
+        await server.getPrimaryService(
+            SERVICE_UUID
+        );
+
+        rxCharacteristic =
+        await service.getCharacteristic(
+            RX_UUID
+        );
+
+        document.getElementById("status").innerHTML="接続成功";
+
+    }
+
+    catch(e){
+
+        console.log(e);
+
+        document.getElementById("status").innerHTML="接続失敗";
+
+    }
+
+}
+
+async function send(cmd){
+
+    if(rxCharacteristic==null){
+
+        alert("先に接続してください");
+
+        return;
+
+    }
+
+    const data =
+    new TextEncoder().encode(cmd+"\n");
+
+    await rxCharacteristic.writeValue(data);
+
+}
+
+</script>
+
+<br>
+
+<button onclick="send('F')">前進</button><br>
+
+<button onclick="send('L')">左</button>
+
+<button onclick="send('S')">停止</button>
+
+<button onclick="send('R')">右</button><br>
+
+<button onclick="send('B')">後退</button>
+
+</body>
+</html>
