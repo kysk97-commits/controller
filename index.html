@@ -4,94 +4,158 @@
 <meta charset="utf-8">
 <title>micro:bit Controller</title>
 <style>
-body {
-    font-family: sans-serif;
-    text-align: center;
-    margin-top: 40px;
+body { font-family: sans-serif; text-align: center; background: #222; color: white; }
+#status { margin: 20px; font-size: 20px; }
+
+.stickArea {
+    width: 200px; height: 200px;
+    background: #444; border-radius: 100px;
+    margin: 20px; position: relative; display: inline-block;
 }
-button {
-    font-size: 22px;
-    padding: 15px 25px;
-    margin: 10px;
+.stick {
+    width: 70px; height: 70px;
+    background: #00aaff; border-radius: 35px;
+    position: absolute; left: 65px; top: 65px;
+    box-shadow: 0 0 10px #00aaff;
 }
-input {
-    width: 80px;
-    font-size: 20px;
+
+.button {
+    width: 70px; height: 70px;
+    background: #555; border-radius: 35px;
+    display: inline-flex; justify-content: center; align-items: center;
+    margin: 10px; font-size: 24px; color: white;
+    box-shadow: 0 0 10px #999;
+}
+.button:active {
+    background: #00ff99;
 }
 </style>
 </head>
 
 <body>
-<h1>micro:bit Controller</h1>
+<h2>micro:bit Controller</h2>
+<div id="status">未接続</div>
 
-<button id="connectBtn">🔵 Connect micro:bit</button>
-<button id="sendBtn">📤 Send JSON</button>
+<button id="connectBtn">micro:bit 接続</button>
 
-<h2>Joystick 1</h2>
-X1: <input id="x1" type="number" value="512"><br>
-Y1: <input id="y1" type="number" value="512"><br>
+<h3>オムニ3輪（左スティック）</h3>
+<div id="stickMove" class="stickArea">
+    <div id="stickMoveKnob" class="stick"></div>
+</div>
 
-<h2>Joystick 2</h2>
-X2: <input id="x2" type="number" value="512"><br>
-Y2: <input id="y2" type="number" value="512"><br>
+<h3>アーム操作（右スティック）</h3>
+<div id="stickArm" class="stickArea">
+    <div id="stickArmKnob" class="stick"></div>
+</div>
 
-<h2>Buttons</h2>
-A: <input id="btnA" type="number" value="0"><br>
-B: <input id="btnB" type="number" value="0"><br>
-X: <input id="btnX" type="number" value="0"><br>
-Y: <input id="btnY" type="number" value="0"><br>
+<h3>ボタン</h3>
+<div>
+    <div class="button" onclick="pressButton('A')">A</div>
+    <div class="button" onclick="pressButton('B')">B</div>
+    <div class="button" onclick="pressButton('X')">X</div>
+    <div class="button" onclick="pressButton('Y')">Y</div>
+</div>
 
 <script>
-let uartServer;
-let uartTx;
+let device;
+let characteristic;
 
-// UART UUID（micro:bit 固定）
-const UART_SERVICE = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-const UART_TX = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";   // write
+// micro:bit UART UUID（完全形式）
+const UART_UUID = '0000ffe1-0000-1000-8000-00805f9b34fb';
 
-// ① 接続処理
 document.getElementById("connectBtn").onclick = async () => {
     try {
-        const device = await navigator.bluetooth.requestDevice({
+        console.log("Bluetooth request started");
+
+        // ★ フィルタを外して必ず選択画面を出す
+        device = await navigator.bluetooth.requestDevice({
             acceptAllDevices: true,
-            optionalServices: [UART_SERVICE]
+            optionalServices: [UART_UUID]
         });
 
         const server = await device.gatt.connect();
-        uartServer = await server.getPrimaryService(UART_SERVICE);
-        uartTx = await uartServer.getCharacteristic(UART_TX);
+        const service = await server.getPrimaryService(UART_UUID);
+        characteristic = await service.getCharacteristic(UART_UUID);
 
-        alert("micro:bit と接続成功！");
-    } catch (error) {
-        alert("接続エラー: " + error);
-        console.error(error);
+        document.getElementById("status").innerText = "接続完了";
+
+        // ★ 接続成功通知
+        sendJSON({ connected: true });
+
+    } catch (e) {
+        console.log(e);
+        document.getElementById("status").innerText = "接続失敗";
     }
 };
 
-// ② JSON送信
-document.getElementById("sendBtn").onclick = async () => {
-    if (!uartTx) {
-        alert("まだ接続されていません");
-        return;
-    }
+// スティック値
+let moveX = 0, moveY = 0;
+let armX = 0, armY = 0;
 
-    const data = {
-        x1: Number(document.getElementById("x1").value),
-        y1: Number(document.getElementById("y1").value),
-        x2: Number(document.getElementById("x2").value),
-        y2: Number(document.getElementById("y2").value),
-        A: Number(document.getElementById("btnA").value),
-        B: Number(document.getElementById("btnB").value),
-        X: Number(document.getElementById("btnX").value),
-        Y: Number(document.getElementById("btnY").value)
-    };
+// スティック処理
+function setupStick(areaId, knobId, callback) {
+    const area = document.getElementById(areaId);
+    const knob = document.getElementById(knobId);
 
-    const text = JSON.stringify(data) + "\n";
-    const encoder = new TextEncoder();
-    await uartTx.writeValue(encoder.encode(text));
+    area.addEventListener("touchmove", (e) => {
+        const rect = area.getBoundingClientRect();
+        const x = e.touches[0].clientX - rect.left - 100;
+        const y = e.touches[0].clientY - rect.top - 100;
 
-    console.log("Sent:", text);
-};
+        const r = Math.min(80, Math.sqrt(x*x + y*y));
+        const angle = Math.atan2(y, x);
+
+        const nx = r * Math.cos(angle);
+        const ny = r * Math.sin(angle);
+
+        knob.style.left = (nx + 100 - 35) + "px";
+        knob.style.top = (ny + 100 - 35) + "px";
+
+        callback(nx, ny);
+    });
+
+    area.addEventListener("touchend", () => {
+        knob.style.left = "65px";
+        knob.style.top = "65px";
+        callback(0, 0);
+    });
+}
+
+// 左スティック（オムニ）
+setupStick("stickMove", "stickMoveKnob", (x, y) => {
+    moveX = Math.round(x);
+    moveY = Math.round(y);
+    sendData();
+});
+
+// 右スティック（サーボ）
+setupStick("stickArm", "stickArmKnob", (x, y) => {
+    armX = Math.round(x);
+    armY = Math.round(y);
+    sendData();
+});
+
+// ボタン送信
+function pressButton(btn) {
+    sendJSON({ btn: btn });
+}
+
+// UART送信（JSON）
+function sendData() {
+    sendJSON({
+        x: moveX,
+        y: moveY,
+        ax: armX,
+        ay: armY
+    });
+}
+
+function sendJSON(obj) {
+    if (!characteristic) return;
+    const data = new TextEncoder().encode(JSON.stringify(obj) + "\n");
+    characteristic.writeValue(data);
+}
 </script>
+
 </body>
 </html>
