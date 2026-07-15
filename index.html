@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Omni Robot Controller</title>
+<title>Omni Controller</title>
 <style>
 #stickArea {
   width: 300px;
@@ -43,18 +43,24 @@ button {
 let device = null;
 let uartService = null;
 
+// ===== Bluetooth 接続 =====
 async function connect() {
-  device = await navigator.bluetooth.requestDevice({
-    filters: [{ namePrefix: "BBC micro:bit" }],
-    optionalServices: ["6e400001-b5a3-f393-e0a9-e50e24dcca9e"]
-  });
+  try {
+    device = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: "BBC micro:bit" }],
+      optionalServices: ["6e400001-b5a3-f393-e0a9-e50e24dcca9e"]
+    });
 
-  const server = await device.gatt.connect();
-  uartService = await server.getPrimaryService("6e400001-b5a3-f393-e0a9-e50e24dcca9e");
+    const server = await device.gatt.connect();
+    uartService = await server.getPrimaryService("6e400001-b5a3-f393-e0a9-e50e24dcca9e");
 
-  alert("接続完了");
+    alert("接続完了");
+  } catch (e) {
+    alert("接続エラー: " + e);
+  }
 }
 
+// ===== UART送信 =====
 async function send(text) {
   if (!uartService) return;
   const tx = await uartService.getCharacteristic("6e400002-b5a3-f393-e0a9-e50e24dcca9e");
@@ -65,7 +71,16 @@ async function send(text) {
 const area = document.getElementById("stickArea");
 const stick = document.getElementById("stick");
 
+let touching = false;
+
+// ★ pointerdown が無いとスマホで pointermove が発火しない
+area.addEventListener("pointerdown", (e) => {
+  touching = true;
+});
+
 area.addEventListener("pointermove", (e) => {
+  if (!touching) return;
+
   const rect = area.getBoundingClientRect();
   const x = e.clientX - (rect.left + rect.width/2);
   const y = e.clientY - (rect.top + rect.height/2);
@@ -79,4 +94,17 @@ area.addEventListener("pointermove", (e) => {
 
   send(`${m1.toFixed(2)},${m2.toFixed(2)},${m3.toFixed(2)}`);
 
-  stick
+  stick.style.left = (x + 110) + "px";
+  stick.style.top = (y + 110) + "px";
+});
+
+area.addEventListener("pointerup", () => {
+  touching = false;
+  stick.style.left = "110px";
+  stick.style.top = "110px";
+  send("0,0,0");
+});
+</script>
+
+</body>
+</html>
