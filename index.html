@@ -65,33 +65,18 @@ async function send(text) {
 const area = document.getElementById("stickArea");
 const stick = document.getElementById("stick");
 
-area.addEventListener("pointermove", (e) => {
-  const rect = area.getBoundingClientRect();
-  const x = e.clientX - (rect.left + rect.width/2);
-  const y = e.clientY - (rect.top + rect.height/2);
+let isTouching = false;
 
-  const r = Math.min(1, Math.sqrt(x*x + y*y) / 150);
-  const theta = Math.atan2(y, x); // ラジアン
-
-  // オムニ120°配置の三角関数
-  const m1 = r * Math.cos(theta - 0);
-  const m2 = r * Math.cos(theta - 2*Math.PI/3);
-  const m3 = r * Math.cos(theta - 4*Math.PI/3);
-
-  // micro:bitへ送信
-  send(`${m1.toFixed(2)},${m2.toFixed(2)},${m3.toFixed(2)}`);
-
-  // スティックの見た目
-  stick.style.left = (x + 110) + "px";
-  stick.style.top = (y + 110) + "px";
-});
-
-area.addEventListener("pointerup", () => {
-  stick.style.left = "110px";
-  stick.style.top = "110px";
+// 指を置いた瞬間に送信開始
+area.addEventListener("pointerdown", (e) => {
+  isTouching = true;
   send("0,0,0");
 });
-</script>
 
-</body>
-</html>
+// 指を動かしたときに送信
+area.addEventListener("pointermove", (e) => {
+  if (!isTouching) return;
+
+  const rect = area.getBoundingClientRect();
+  const x = e.clientX - (rect.left + rect.width/2);
+  const y =
