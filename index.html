@@ -2,216 +2,96 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>micro:bit Controller</title>
+<title>Omni Robot Controller</title>
 <style>
-body {
-    font-family: sans-serif;
-    text-align: center;
-    background: #222;
-    color: white;
+#stickArea {
+  width: 300px;
+  height: 300px;
+  background: #eee;
+  border-radius: 50%;
+  margin: 20px auto;
+  touch-action: none;
+  position: relative;
 }
-
+#stick {
+  width: 80px;
+  height: 80px;
+  background: #888;
+  border-radius: 50%;
+  position: absolute;
+  left: 110px;
+  top: 110px;
+}
 button {
-    font-size: 22px;
-    padding: 15px 25px;
-    margin: 10px;
-}
-
-#pad {
-    display: flex;
-    justify-content: space-around;
-    margin-top: 30px;
-}
-
-.joystickArea {
-    width: 180px;
-    height: 180px;
-    background: #444;
-    border-radius: 50%;
-    position: relative;
-    touch-action: none;
-}
-
-.stick {
-    width: 70px;
-    height: 70px;
-    background: #00aaff;
-    border-radius: 50%;
-    position: absolute;
-    left: 55px;
-    top: 55px;
-}
-
-#buttons {
-    margin-top: 40px;
-}
-
-.btn {
-    width: 80px;
-    height: 80px;
-    background: #ff4444;
-    border-radius: 50%;
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 30px;
-    margin: 10px;
-    touch-action: none;
+  font-size: 20px;
+  padding: 10px;
+  margin: 10px;
 }
 </style>
 </head>
-
 <body>
-<h1>micro:bit Controller</h1>
 
-<button id="connectBtn">🔵 Connect micro:bit</button>
+<h2>Omni Robot Controller</h2>
 
-<div id="pad">
-    <div id="joy1" class="joystickArea">
-        <div id="stick1" class="stick"></div>
-    </div>
+<button onclick="connect()">micro:bit 接続</button>
 
-    <div id="joy2" class="joystickArea">
-        <div id="stick2" class="stick"></div>
-    </div>
-</div>
-
-<div id="buttons">
-    <div id="btnA" class="btn">A</div>
-    <div id="btnB" class="btn">B</div>
-    <div id="btnX" class="btn">X</div>
-    <div id="btnY" class="btn">Y</div>
+<div id="stickArea">
+  <div id="stick"></div>
 </div>
 
 <script>
-let uartTx;
+let device = null;
+let uartService = null;
 
-// UART UUID
-const UART_SERVICE = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-const UART_TX = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+async function connect() {
+  device = await navigator.bluetooth.requestDevice({
+    filters: [{ namePrefix: "BBC micro:bit" }],
+    optionalServices: ["6e400001-b5a3-f393-e0a9-e50e24dcca9e"]
+  });
 
-// joystick values
-let x1 = 512, y1 = 512;  // オムニ用
-let x2 = 512, y2 = 512;  // アーム用
+  const server = await device.gatt.connect();
+  uartService = await server.getPrimaryService("6e400001-b5a3-f393-e0a9-e50e24dcca9e");
 
-// button values
-let A = 0, B = 0, X = 0, Y = 0;
-
-// command（アームの追加動作）
-let cmd = "";
-
-// --------------------
-// micro:bit 接続
-// --------------------
-document.getElementById("connectBtn").onclick = async () => {
-    try {
-        const device = await navigator.bluetooth.requestDevice({
-            acceptAllDevices: true,
-            optionalServices: [UART_SERVICE]
-        });
-
-        const server = await device.gatt.connect();
-        const service = await server.getPrimaryService(UART_SERVICE);
-        uartTx = await service.getCharacteristic(UART_TX);
-
-        alert("micro:bit と接続成功！");
-    } catch (e) {
-        alert("接続エラー: " + e);
-    }
-};
-
-// --------------------
-// JSON送信
-// --------------------
-function sendJSON() {
-    if (!uartTx) return;
-
-    const data = {
-        omniX: x1,
-        omniY: y1,
-        armX: x2,
-        armY: y2,
-        A, B, X, Y,
-        cmd
-    };
-
-    const text = JSON.stringify(data) + "\n";
-    const encoder = new TextEncoder();
-    uartTx.writeValue(encoder.encode(text));
+  alert("接続完了");
 }
 
-// --------------------
-// ジョイスティック処理
-// --------------------
-function setupJoystick(areaId, stickId, callback) {
-    const area = document.getElementById(areaId);
-    const stick = document.getElementById(stickId);
-
-    const rect = area.getBoundingClientRect();
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-
-    area.addEventListener("pointerdown", start);
-    area.addEventListener("pointermove", move);
-    area.addEventListener("pointerup", end);
-    area.addEventListener("pointerleave", end);
-
-    function start(e) { move(e); }
-    function move(e) {
-        const x = e.offsetX - centerX;
-        const y = e.offsetY - centerY;
-
-        const limit = 60;
-        const dx = Math.max(-limit, Math.min(limit, x));
-        const dy = Math.max(-limit, Math.min(limit, y));
-
-        stick.style.left = (centerX + dx - 35) + "px";
-        stick.style.top = (centerY + dy - 35) + "px";
-
-        const valX = Math.floor((dx + limit) * (1023 / (limit * 2)));
-        const valY = Math.floor((dy + limit) * (1023 / (limit * 2)));
-
-        callback(valX, valY);
-        sendJSON();
-    }
-
-    function end() {
-        stick.style.left = (centerX - 35) + "px";
-        stick.style.top = (centerY - 35) + "px";
-        callback(512, 512);
-        sendJSON();
-    }
+async function send(text) {
+  if (!uartService) return;
+  const tx = await uartService.getCharacteristic("6e400002-b5a3-f393-e0a9-e50e24dcca9e");
+  await tx.writeValue(new TextEncoder().encode(text + "\n"));
 }
 
-setupJoystick("joy1", "stick1", (vx, vy) => { x1 = vx; y1 = vy; });
-setupJoystick("joy2", "stick2", (vx, vy) => { x2 = vx; y2 = vy; });
+// ===== スティック処理 =====
+const area = document.getElementById("stickArea");
+const stick = document.getElementById("stick");
 
-// --------------------
-// ボタン処理
-// --------------------
-function setupButton(id, setter, command) {
-    const btn = document.getElementById(id);
+area.addEventListener("pointermove", (e) => {
+  const rect = area.getBoundingClientRect();
+  const x = e.clientX - (rect.left + rect.width/2);
+  const y = e.clientY - (rect.top + rect.height/2);
 
-    btn.addEventListener("pointerdown", () => {
-        setter(1);
-        cmd = command;
-        btn.style.background = "#ffaa00";
-        sendJSON();
-    });
+  const r = Math.min(1, Math.sqrt(x*x + y*y) / 150);
+  const theta = Math.atan2(y, x); // ラジアン
 
-    btn.addEventListener("pointerup", () => {
-        setter(0);
-        cmd = "";
-        btn.style.background = "#ff4444";
-        sendJSON();
-    });
-}
+  // オムニ120°配置の三角関数
+  const m1 = r * Math.cos(theta - 0);
+  const m2 = r * Math.cos(theta - 2*Math.PI/3);
+  const m3 = r * Math.cos(theta - 4*Math.PI/3);
 
-setupButton("btnA", v => A = v, "arm_up");
-setupButton("btnB", v => B = v, "arm_down");
-setupButton("btnX", v => X = v, "arm_open");
-setupButton("btnY", v => Y = v, "arm_close");
+  // micro:bitへ送信
+  send(`${m1.toFixed(2)},${m2.toFixed(2)},${m3.toFixed(2)}`);
 
+  // スティックの見た目
+  stick.style.left = (x + 110) + "px";
+  stick.style.top = (y + 110) + "px";
+});
+
+area.addEventListener("pointerup", () => {
+  stick.style.left = "110px";
+  stick.style.top = "110px";
+  send("0,0,0");
+});
 </script>
+
 </body>
 </html>
