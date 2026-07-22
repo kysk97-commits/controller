@@ -73,7 +73,7 @@ const stick = document.getElementById("stick");
 
 let touching = false;
 
-// ★ pointerdown が無いとスマホで pointermove が発火しない
+// ★ スマホで pointermove を発火させるために必須
 area.addEventListener("pointerdown", (e) => {
   touching = true;
 });
